@@ -5,6 +5,79 @@ import threading
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from playwright.async_api import async_playwright
 
+# Servidor de manutenção para evitar o encerramento do Web Service no Render
+class SimpleHTTPRequestHandler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        self.send_response(200)
+        self.end_headers()
+        self.wfile.write(b"Bot TipMiner Ativo!")
+
+def run_dummy_server():
+    port = int(os.environ.get("PORT", 10000))
+    server = HTTPServer(('0.0.0.0', port), SimpleHTTPRequestHandler)
+    server.serve_forever()
+
+threading.Thread(target=run_dummy_server, daemon=True).start()
+
+# Configuração do Webhook do Google Apps Script
+URL_WEBHOOK = os.getenv("WEBHOOK_URL", "SUA_URL_DO_GOOGLE_APPS_SCRIPT_AQUI")
+
+horarios_enviados = set()
+
+async def main():
+    global horarios_enviados
+    async with async_playwright() as p:
+        browser = await p.chromium.launch(
+            headless=True,
+            args=["--no-sandbox", "--disable-setuid-sandbox"]
+        )
+        context = await browser.new_context(
+            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
+        )
+        page = await context.new_page()
+
+        print("Conectando ao TipMiner Double Blaze...")
+        await page.goto("https://www.tipminer.com/br/cassinos/blaze/double", wait_until="domcontentloaded", timeout=60000)
+
+        while True:
+            try:
+                # Busca os blocos de resultados no TipMiner
+                cards = await page.query_selector_all("div.cell, div.result-item, div[class*='cell']")
+                
+                for card in cards:
+                    html_content = await card.inner_html()
+                    # Identifica se a célula corresponde à pedra branca
+                    if "white" in html_content.lower() or "branca" in html_content.lower() or "0.png" in html_content:
+                        texto = await card.inner_text()
+                        linhas = texto.split("\n")
+                        for linha in linhas:
+                            linha = linha.strip()
+                            # Procura pelo formato de horário HH:MM
+                            if len(linha) == 5 and ":" in linha:
+                                if linha not in horarios_enviados:
+                                    horarios_enviados.add(linha)
+                                    print(f"⚪ PEDRA BRANCA ENCONTRADA: {linha}")
+                                    
+                                    try:
+                                        res = requests.post(URL_WEBHOOK, json={"horario": linha}, timeout=10)
+                                        print(f"✅ Enviado ao Google Sites! Resposta: {res.status_code}")
+                                    except Exception as err:
+                                        print(f"❌ Erro ao enviar Webhook: {err}")
+            except Exception as e:
+                print(f"Aviso de leitura: {e}")
+
+            # Aguarda 15 segundos para a próxima varredura
+            await asyncio.sleep(15)
+
+if __name__ == "__main__":
+    asyncio.run(main())
+    import asyncio
+import os
+import requests
+import threading
+from http.server import HTTPServer, BaseHTTPRequestHandler
+from playwright.async_api import async_playwright
+
 # Servidor de manutenção de porta para o Render Web Service
 class SimpleHTTPRequestHandler(BaseHTTPRequestHandler):
     def do_GET(self):
