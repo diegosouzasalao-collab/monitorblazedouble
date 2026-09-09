@@ -4,7 +4,7 @@ import requests
 from datetime import datetime, timedelta
 
 # Insira a URL do seu Google Apps Script diretamente aqui ou configure no Render (WEBHOOK_URL)
-URL_WEBHOOK = os.getenv("WEBHOOK_URL", "https://script.google.com/macros/s/SEU_ID_AQUI/exec")
+URL_WEBHOOK = os.getenv("WEBHOOK_URL", "https://script.google.com/macros/s/AKfycbzU_ZsBTQFIg4vtTjMbf64brp6U2mW0wh7AnT7dWOGPi6hopZYCpwzBJ9fPwFv7BhMi/exec")
 horarios_enviados = set()
 
 def buscar_resultados():
