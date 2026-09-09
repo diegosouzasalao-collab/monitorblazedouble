@@ -1,6 +1,73 @@
 import asyncio
 import os
 import requests
+from playwright.async_api import async_playwright
+
+# Insira a URL do seu Google Apps Script abaixo ou configure no Render (Key: WEBHOOK_URL)
+URL_WEBHOOK = os.getenv("WEBHOOK_URL", "COLE_AQUI_A_URL_DO_SEU_GOOGLE_APPS_SCRIPT")
+
+horarios_enviados = set()
+
+async def main():
+    global horarios_enviados
+    
+    async with async_playwright() as p:
+        # Inicia o Chromium configurado para rodar em servidores na nuvem
+        browser = await p.chromium.launch(
+            headless=True,
+            args=["--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage"]
+        )
+        context = await browser.new_context(
+            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
+        )
+        page = await context.new_page()
+
+        print("🤖 Background Worker ativo e monitorando TipMiner...")
+
+        while True:
+            try:
+                # Recarrega a página do TipMiner para ler os últimos resultados
+                await page.goto("https://www.tipminer.com/br/cassinos/blaze/double", wait_until="domcontentloaded", timeout=45000)
+                await asyncio.sleep(3)
+
+                # Busca todos os blocos de resultados do grid
+                cards = await page.query_selector_all("div.cell, div.result-item, div[class*='cell']")
+                
+                for card in cards:
+                    html_content = await card.inner_html()
+                    
+                    # Filtra apenas pedras brancas
+                    if "white" in html_content.lower() or "branca" in html_content.lower() or "0.png" in html_content:
+                        texto = await card.inner_text()
+                        linhas = texto.split("\n")
+                        for linha in linhas:
+                            linha = linha.strip()
+                            if len(linha) == 5 and ":" in linha:
+                                if linha not in horarios_enviados:
+                                    horarios_enviados.add(linha)
+                                    print(f"⚪ PEDRA BRANCA ENCONTRADA: {linha}")
+                                    
+                                    # Envia para o seu aplicativo no Google Sites
+                                    if "script.google.com" in URL_WEBHOOK:
+                                        try:
+                                            res = requests.post(URL_WEBHOOK, json={"horario": linha}, timeout=10)
+                                            print(f"✅ Enviado ao Google Apps Script! Status: {res.status_code}")
+                                        except Exception as err:
+                                            print(f"❌ Erro ao enviar Webhook: {err}")
+                                    else:
+                                        print("⚠️ URL_WEBHOOK não configurada com um link válido do Google Apps Script.")
+            
+            except Exception as e:
+                print(f"Aviso no ciclo de leitura: {e}")
+
+            # Aguarda 20 segundos para realizar a próxima consulta
+            await asyncio.sleep(20)
+
+if __name__ == "__main__":
+    asyncio.run(main())
+    import asyncio
+import os
+import requests
 import threading
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from playwright.async_api import async_playwright
