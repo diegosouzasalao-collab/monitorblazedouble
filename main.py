@@ -62,7 +62,8 @@ async def main():
             await asyncio.sleep(1)
 
 if __name__ == "__main__":
-    asyncio.run(main())import asyncio
+    asyncio.run(main())
+    import asyncio
 import os
 import requests
 from playwright.async_api import async_playwright
