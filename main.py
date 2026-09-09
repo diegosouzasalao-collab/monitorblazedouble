@@ -4,6 +4,76 @@ import requests
 import threading
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from playwright.async_api import async_playwright
+
+# Servidor de manutenção de porta para o Render Web Service
+class SimpleHTTPRequestHandler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        self.send_response(200)
+        self.end_headers()
+        self.wfile.write(b"Bot TipMiner Ativo!")
+
+def run_dummy_server():
+    port = int(os.environ.get("PORT", 10000))
+    server = HTTPServer(('0.0.0.0', port), SimpleHTTPRequestHandler)
+    server.serve_forever()
+
+threading.Thread(target=run_dummy_server, daemon=True).start()
+
+# Configuração do Webhook do Google Apps Script
+URL_WEBHOOK = os.getenv("WEBHOOK_URL", "SUA_URL_DO_GOOGLE_APPS_SCRIPT_AQUI")
+
+ultimo_horario_enviado = ""
+
+async def main():
+    global ultimo_horario_enviado
+    async with async_playwright() as p:
+        browser = await p.chromium.launch(headless=True)
+        context = await browser.new_context(
+            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+        )
+        page = await context.new_page()
+
+        print("Conectando ao TipMiner Double Blaze...")
+        await page.goto("https://www.tipminer.com/br/cassinos/blaze/double", wait_until="domcontentloaded")
+
+        while True:
+            try:
+                # Procura no HTML por pedras brancas (ícones de fogo/diamante branco ou estilo branco)
+                # O TipMiner exibe cada rodada com classes específicas para pedras brancas
+                elementos_brancos = await page.query_selector_all('.white, [class*="white"], [data-color="white"]')
+                
+                for el in elementos_brancos:
+                    # Tenta capturar o texto do horário abaixo da pedra
+                    texto = await el.inner_text()
+                    if ":" in texto:
+                        horario = texto.strip()
+                        
+                        # Evita enviar o mesmo horário repetidamente
+                        if horario != ultimo_horario_enviado:
+                            ultimo_horario_enviado = horario
+                            print(f"⚪ PEDRA BRANCA ENCONTRADA no TipMiner às {horario}!")
+                            
+                            # Envia para o Google Apps Script
+                            try:
+                                requests.post(URL_WEBHOOK, json={"horario": horario}, timeout=10)
+                                print("✅ Enviado com sucesso para o Google Sites!")
+                            except Exception as err:
+                                print(f"❌ Erro de envio ao Webhook: {err}")
+                            break
+            except Exception as e:
+                pass
+
+            # Aguarda 10 segundos antes de verificar novamente
+            await asyncio.sleep(10)
+
+if __name__ == "__main__":
+    asyncio.run(main())
+    import asyncio
+import os
+import requests
+import threading
+from http.server import HTTPServer, BaseHTTPRequestHandler
+from playwright.async_api import async_playwright
 from datetime import datetime
 
 # Servidor Falso para enganar a checagem de porta do Render
