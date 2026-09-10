@@ -11,7 +11,7 @@ def buscar_resultados():
     global horarios_enviados
     
     # Usa um proxy público para mascarar o IP do Render e burlar o Cloudflare
-    url_proxy = "https://api.allorigins.win/get?url=" + requests.utils.quote("https://blaze.com/api/roulette_games/recent")
+    url_proxy = "https://proxy-blaze-5m7o.vercel.app/api/blaze" + requests.utils.quote("https://blaze.com/api/roulette_games/recent")
     
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
