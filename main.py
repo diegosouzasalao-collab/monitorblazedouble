@@ -3,65 +3,51 @@ import os
 import requests
 from datetime import datetime, timedelta
 
-# Insira a URL do seu Google Apps Script diretamente aqui ou configure no Render (WEBHOOK_URL)
-URL_WEBHOOK = os.getenv("WEBHOOK_URL", "https://script.google.com/macros/s/https://script.google.com/macros/s/AKfycbzU_ZsBTQFIg4vtTjMbf64brp6U2mW0wh7AnT7dWOGPi6hopZYCpwzBJ9fPwFv7BhMi/exec/exec")
+# URL do seu proxy criado na Vercel
+URL_PROXY = "https://proxy-blaze-5m7o.vercel.app/api/blaze"
+
+# URL do seu Google Apps Script (Webhook)
+URL_WEBHOOK = os.getenv("https://script.google.com/macros/s/AKfycbzU_ZsBTQFIg4vtTjMbf64brp6U2mW0wh7AnT7dWOGPi6hopZYCpwzBJ9fPwFv7BhMi/exec")
+
 horarios_enviados = set()
 
-def buscar_resultados():
+def monitorar_com_proxy():
     global horarios_enviados
-    
-    # Usa um proxy público para mascarar o IP do Render e burlar o Cloudflare
-    url_proxy = "https://proxy-blaze-5m7o.vercel.app/api/blaze" + requests.utils.quote("https://blaze.com/api/roulette_games/recent")
-    
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
-    }
-
     try:
-        response = requests.get(url_proxy, headers=headers, timeout=12)
-        
+        response = requests.get(URL_PROXY, timeout=10)
         if response.status_code == 200:
-            data = response.json()
-            # Extrai o conteúdo brutos da API enviado pelo proxy
-            import json
-            conteudo = json.loads(data.get("contents", "[]"))
+            dados = response.json()
             
-            for item in conteudo:
-                color = item.get("color")
-                created_at = item.get("created_at")
-                
-                # color == 0 representa a Pedra Branca
-                if color == 0 and created_at:
-                    # Converte de UTC para Horário Oficial de Brasília (UTC-3)
-                    dt_utc = datetime.fromisoformat(created_at.replace("Z", "+00:00"))
-                    dt_brt = dt_utc - timedelta(hours=3)
-                    horario_formatado = dt_brt.strftime("%H:%M")
+            if isinstance(dados, list):
+                for item in dados:
+                    color = item.get("color")
+                    created_at = item.get("created_at")
                     
-                    if horario_formatado not in horarios_enviados:
-                        horarios_enviados.add(horario_formatado)
-                        print(f"⚪ PEDRA BRANCA ENCONTRADA: {horario_formatado}")
+                    # color == 0 representa a Pedra Branca
+                    if color == 0 and created_at:
+                        # Converte de UTC para Horário de Brasília (UTC-3)
+                        dt_utc = datetime.fromisoformat(created_at.replace("Z", "+00:00"))
+                        dt_brt = dt_utc - timedelta(hours=3)
+                        horario_formatado = dt_brt.strftime("%H:%M")
+                        
+                        if horario_formatado not in horarios_enviados:
+                            horarios_enviados.add(horario_formatado)
+                            print(f"⚪ PEDRA BRANCA CAPTURADA: {horario_formatado}")
 
-                        # Envio ao Google Apps Script
-                        if "script.google.com" in URL_WEBHOOK:
-                            try:
-                                res = requests.post(URL_WEBHOOK, json={"horario": horario_formatado}, timeout=10)
-                                print(f"✅ Enviado ao Google Apps Script! Status: {res.status_code}")
-                            except Exception as err:
-                                print(f"❌ Erro de conexao Webhook: {err}")
-                        else:
-                            print("⚠️ ATENÇÃO: Adicione a URL do Google Apps Script na variável URL_WEBHOOK!")
-        else:
-            print(f"⚠️ Servidor proxy respondeu com status: {response.status_code}")
-
+                            if "script.google.com" in URL_WEBHOOK:
+                                try:
+                                    res = requests.post(URL_WEBHOOK, json={"horario": horario_formatado}, timeout=10)
+                                    print(f"✅ Enviado ao Google Apps Script! Status: {res.status_code}")
+                                except Exception as err:
+                                    print(f"❌ Erro de envio ao Webhook: {err}")
     except Exception as e:
-        print(f"Aviso no ciclo de consulta: {e}")
+        print(f"Aviso de consulta: {e}")
 
 async def main():
-    print("🚀 Monitoramento via Proxy iniciado com sucesso!")
+    print("🚀 Robô ativado e conectado ao Proxy da Vercel!")
     while True:
-        buscar_resultados()
-        # Consulta a cada 10 segundos
-        await asyncio.sleep(10)
+        monitorar_com_proxy()
+        await asyncio.sleep(8)
 
 if __name__ == "__main__":
     asyncio.run(main())
